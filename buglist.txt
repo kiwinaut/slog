@@ -1,0 +1,9 @@
+- undo-redo fails?
+- old data season str to int "S01"
+
+
+features
+- html export?
+- string search without type s
+- choose/save databse from console 
+- database backup

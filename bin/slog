@@ -1,0 +1,285 @@
+#!/usr/bin/env ruby
+$:.unshift(File.expand_path("../",File.dirname(__FILE__)) + "/lib")
+require 'optparse'
+require 'time'
+require 'yaml'
+require "color_module"
+require "hash_operations"
+VERSION = "0.4.1"
+$options = {}
+`. << EOF
+export LINES
+EOF`
+parser = OptionParser.new do |opts|
+	opts.banner = "Usage: slog.rb [opt] title episode[s]"
+	opts.on('-n', '--new title', 'New title') do |title|
+		$options[:title] = title
+	end
+	opts.on("-s n", "--search title","Search") do |search|
+		$options[:search] = search
+	end
+	#opts.on("-e 101,102,103-109", Array, "Episodes") do |epis|
+	#	$options[:epis] = epis
+	#end
+	opts.on("-e episodes", "--episodes episodes", "Episodes") do |epis|
+		$options[:epis] = epis
+	end
+	opts.on("-l", "--list-all","List all titles") do |list|
+		$options[:list] = list
+	end
+	opts.on("-i", "--interactive","Interactive mod for rename, delete etc..") do |var|
+		$options[:inter] = var
+	end
+end
+
+class String
+	include Colormodule
+end
+
+parser.parse!
+
+def web_command(picks)
+	picks.each do |dom|
+		str = (dom[:epis].last + 1).to_s
+		s = "S0#{str[0]}"
+		e = "E#{str[1,2]}"
+		`opera-developer "http://kickass.to/torrents/usearch/?q=#{dom[:title]} #{s}#{e}"`
+		`opera-developer "http://divxplanet.com/index.php?page=name#{dom[:title]}"`
+	end
+end
+def list(data)
+	#lines = ENV['LINES']
+	pp = PrintTemplate.new($hashy.data)
+	pp.style1(data)
+end
+def list_today(data)
+	data.select do |x|
+		day = (Time.now.to_i - x[:time].to_i)/86400
+		day >= 7 && day <=13
+	end
+end
+def eval_prompt1
+	loopy = true
+	while loopy
+		p = "#{" [".grey}#{"L".bluelight}#{"IST|".grey}#{"%".bluelight}#{"SEARCH|".grey}#{"N".bluelight}#{"EW|".grey}#{"U".bluelight}#{"NDO|".grey}#{"Q".bluelight}#{"UIT?] ".grey}"
+		choose = $hashy.iop.prompt(p)
+		case choose
+		when "l","L"
+			list($hashy.data)
+		when "n","N"
+			$hashy.newtitle
+		when "u","U"
+			$hashy.undo
+		when "o","O"
+			$hashy.redo
+		when "*"
+			list $hashy.data
+			eval_prompt2($hashy.data)
+		when "q","Q"
+			$hashy.save
+			exit 0
+		end
+		if choose =~ /[a-zA-Z]([a-zA-Z]+\s?)+/
+			#answer = $hashy.iop.prompt(" [?] ".grey)
+			$options[:search] = choose
+			result = $hashy.find($options[:search])
+			unless result.empty?
+				list result
+				eval_prompt2(result)
+			else
+				puts " NO RESULT!".grey
+			end
+		end
+	end
+end
+def eval_prompt2(result)
+	loopy2 = true
+	while loopy2
+		#counter = list result
+		if result.size > 1
+			if $flag
+				p = "#{" [<<".grey}#{"B".bluelight}#{"|".grey}#{"#".bluelight}#{"PICK|".grey}#{"%".bluelight}#{"RESEARCH|".grey}#{"U".bluelight}#{"NDO|".grey}#{"Q".bluelight}#{"UIT?] ".grey}"
+			else
+				p = "#{" [".grey}#{"#".bluelight}#{"PICK|".grey}#{"%".bluelight}#{"RESEARCH|".grey}#{"C".bluelight}#{"ANCEL?] ".grey}"
+			end
+			choose = $hashy.iop.prompt(p)
+			case choose
+			when "b","B"
+				loopy2 = false
+			when "q","Q"
+				$hashy.save
+				exit 0
+			end
+			if choose =~ /[a-zA-Z]([a-zA-Z]+\s?)+/
+				#answer = $hashy.iop.prompt(" [?] ".grey)
+				$options[:search] = choose
+				result = $hashy.find($options[:search])
+				unless result.empty?
+					list result
+				else
+					puts " NO RESULT!".grey
+					loopy2 = false
+				end
+			end
+			if choose =~ /(\d+(,|-)?)+/
+				pick_list = ($hashy.iop.episode_parse choose)[0]
+				#p choose.to_i ,  result.size, pick_list
+				pick_list.select! {|y| y>0 && y <= result.size }
+				picks = pick_list.collect {|x| result[x-1]}
+				list picks
+				eval_prompt3(picks)
+				loopy2 = false if $flag
+			end
+		elsif result.size == 1
+			eval_prompt3(result)
+			loopy2 = false if $flag
+		end
+	end
+end
+def eval_prompt3(picks)
+	loopy3 = true
+	while loopy3
+		if $flag
+			p = "#{" [".grey}#{"B".bluelight}#{"ACK|".grey}#{"R".bluelight}#{"ENAME|".grey}#{"D".bluelight}#{"ELETE|".grey}#{"I".bluelight}#{"NSERT|".grey}#{"E".bluelight}#{"XRACT|".grey}#{"W".bluelight}#{"EB|".grey}#{"U".bluelight}#{"NDO|".grey}#{"Q".bluelight}#{"UIT?] ".grey}"
+		else
+			p = "#{" [".grey}#{"R".bluelight}#{"ENAME|".grey}#{"D".bluelight}#{"ELETE|".grey}#{"I".bluelight}#{"NSERT|".grey}#{"E".bluelight}#{"XRACT|".grey}#{"W".bluelight}#{"EB|".grey}#{"S".bluelight}#{"AVE|".grey}#{"C".bluelight}#{"ANCEL?] ".grey}"
+		end
+		choose = $hashy.iop.prompt(p)
+		case choose
+		when "r","R"
+			#$hashy.rename_title(picks, data)
+			puts "out of service"
+		when "d","D"
+			picks.each do |dom|
+				$hashy.delete_title(dom)
+			end
+			loopy3 = false
+		when "i","I"
+			picks.each do |dom|
+				if $flag
+					list(Array.new(1,dom))
+					ep, season = $hashy.iop.episode_prompt
+				else
+					ep, season = $hashy.iop.episode_parse($options[:epis])
+				end
+				$hashy.insert(dom, ep, season)
+				if $flag
+					list(Array.new(1,dom))
+				end
+			end
+			unless $flag
+				list picks
+			end
+			#$hashy.save
+			#loopy3 = false unless $flag
+		when "e","E"
+			picks.each do |dom|
+				if $flag
+					list(Array.new(1,dom))
+					ep, season = $hashy.iop.episode_prompt
+				else
+					ep, season = $hashy.iop.episode_parse($options[:epis])
+				end
+				$hashy.extract(dom, ep, season)
+				if $flag
+					list(Array.new(1,dom))
+				end
+			end
+			unless $flag
+				list picks
+			end
+			#$hashy.save
+			loopy3 = false unless $flag
+		when "b","B"
+			loopy3 = false
+		when "u","U"
+			$hashy.undo
+		when "o","O"
+			$hashy.redo
+		when "w","W"
+			web_command(picks)
+		when "c","C"
+			exit 0
+		when "q","Q","s","S"
+			$hashy.save
+			exit 0
+		end
+	end
+end
+intro2 = "\
+               ______     __         ______     ______
+              /\\  ___\\   /\\ \\       /\\  __ \\   /\\  ___\\
+              \\ \\___  \\  \\ \\ \\____  \\ \\ \\/\\ \\  \\ \\ \\__ \\
+               \\/\\_____\\  \\ \\_____\\  \\ \\_____\\  \\ \\_____\\
+                \\/_____/   \\/_____/   \\/_____/   \\/_____/" + " #{VERSION}\n"
+puts intro2.grey
+$text_base = {
+	undo1: " [NOTHING TO UNDO!]".grey,
+	undo2: " [DONE!]".grey
+}
+$hashy = Hash_ops.new
+$hashy.save
+$recipe = 0
+#p $options
+$flag = false
+$flag = $options[:inter] unless $options[:inter].nil?
+if !$options.nil?
+	if !$options[:search].nil?
+		if !$options[:search].empty?
+			$recipe = $recipe | 1
+		end
+	end
+	if !$options[:inter].nil?
+		if $options[:inter]
+			$recipe = $recipe | 2
+		end
+	end
+	if !$options[:epis].nil?
+		if !$options[:epis].empty?
+			$recipe = $recipe | 4
+		end
+	end
+	if !$options[:list].nil?
+		if $options[:list]
+			$recipe = $recipe | 8
+		end
+	end
+end
+
+case $recipe
+when 0
+	#puts "0"
+when 1
+	#puts "1"
+	list $hashy.find($options[:search])
+when 2, 6
+	#puts "2"
+	eval_prompt1
+when 3, 7
+	#flag == true
+	#puts "3"
+	result = $hashy.find($options[:search])
+	unless result.empty?
+		list result
+		eval_prompt2(result)
+	end
+when 4
+	#puts "4"
+	list $hashy.data
+	eval_prompt2($hashy.data)
+when 5
+	#flag == false
+	#puts "5"
+	result = $hashy.find($options[:search])
+	unless result.empty?
+		list result
+		eval_prompt2(result)
+	end
+when 8
+	#puts "8"
+	list($hashy.data)
+when 9
+	puts "9"
+else
+	puts "CONFUSED SCRIPT!".yellow
+end
