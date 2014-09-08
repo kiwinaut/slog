@@ -95,23 +95,16 @@ end
 class PrintTemplate
 	def initialize(data)
 		@data = data
-		#p @data[0][:epis]
 	end
 	def style1(data)
 	counter = 1
 	print "#{" [------------------------------------------------------------------------]".grey}\n"
-	#fill += 1
 	data.each do |entry|
-		#fill += pp.style1(x,c)
-		#if fill > lines.to_i-1
-		#	fill = 0
-		#	#STDIN.getc
-		#end
-		#fill = 0
+		datecol = to_day(entry[:time])
 		seastr = String.new
 		unless entry[:season].nil?
 			unless entry[:season].empty?
-				seastr << " Sea["
+				seastr << " S["
 				last = entry[:season].pop
 				entry[:season].each {|ss| seastr << "#{ss.to_s}|"}
 				seastr << "#{last}]"
@@ -119,13 +112,15 @@ class PrintTemplate
 			end
 		end
 		print "#{counter.to_s.concat("- ").rjust(5).grey}"
-		print "#{entry[:title].upcase.bluelight.concat(seastr.grey).ljust(70)}"
-		print "#{"[".grey}#{date_string(to_day(entry[:time]))}#{"|".concat(entry[:time].strftime("%d/%m/%y")).concat("]").grey}".rjust(50)
+		print "#{date_title(entry).concat(seastr.grey).ljust(70)}"
+		print "#{"[".grey}#{date_string(to_day(entry[:time]),entry[:epis].empty?)}#{"|".concat(entry[:time].strftime("%d/%m/%y")).concat("]").grey}".rjust(50)
 		print "\n"
 		counter += 1
 		unless entry[:epis].nil?
 			unless entry[:epis].empty?
-				printepis2 entry[:epis],entry[:last_epis]
+				dotting entry[:epis],entry[:last_epis] do |dot|
+					print dot
+				end
 			else
 				print "	#{"WATCH ME!".back2}\n" if entry[:season].empty?
 			end
@@ -139,100 +134,70 @@ class PrintTemplate
 		day = ((now - past)/86400).round
 		day
 	end
-	def date_string(day)
+	def date_title(entry)
+		if entry[:epis].empty? && !entry[:season].empty?
+			return entry[:title].upcase.grey2
+		else
+			return entry[:title].upcase.bluelight
+		end
+	end
+	def date_string(day,bool)
 		week = day / 7
+		if bool
+			return "#{week.to_s}W".grey
+		end
 		if day == 0
 			return "TODAY".redlight
 		elsif day <= 6
-			return "#{day.to_s}D".grey2
+			return "#{day.to_s}".orange
 		elsif day <= 13
-			return "CHECK".greenlight
-		elsif week <= 11
+			return "#{day.to_s}".greenlight
+		elsif week <= 4
 			return "#{week.to_s}W".cyan
-		elsif week >= 12
-			return "SLEEP".blue
-			#return "[#{time.strftime("%d.%m.%y")}]".grey
+		elsif week > 4
+			return "#{week.to_s}W".blue
 		end
 	end
-	def episode_print (array)
-		counter = 1
-		print("      |-".grey)
-		array.each do |string|
-			print("#{string.orange}") if counter % 2 == 1
-			print("#{string.grey2}") if counter % 2 == 0
-			counter += 1
-		end
-		print "\n"
-	end
-	def printepis(epis)
-		counter = 0
-		epis.sort!
-		dotdot(epis) do |x|
-			#puts x.inspect
-			episode_print x
-			counter += 1
-		end
-		return counter
-	end
-	def printepis2(epis,last)
-		epis.sort!
-		dotdot2(epis,last) do |x|
-			print x
-		end
-	end
-	def dotdot(epis)
-		str = nil
-		season_partition(epis) do |season|
-			p season
-			temp = []
-			partition(season) do |parts|
-				p parts
-				str = "#{parts[0]} " if parts.size == 1
-				str = "#{parts[0]}-#{parts[1]} " if parts.size == 2
-				if parts.size > 2
-					if parts.size > 24
-						com = "-" * (6)
-						str = "[#{parts.first}#{com}#{parts.last}] "
-					else
-						com = "." * (parts.size-2)
-						str = "#{parts.first}#{com}#{parts.last} "
-					end
-				end
-				temp << str
+	def dotting(epis,last)
+		pick_color = lambda do |var,rep|
+			last ||= []
+			answer = last.include? var
+			if answer
+				return rep.back2
+			else
+				return rep.orange
 			end
-			yield temp
 		end
-	end
-	def dotdot2(epis,last)
-		#last = {}
-		#last[:epis] += [710,709,706]
-		quiz = last.nil? || last.empty?
 		season_partition(epis) do |season|
-		counter = 0
 			string = String.new("").concat("      |-".grey)
-			partition(season) do |parts|
-				parts.each_with_index do |x,i|
-					if counter % 2 == 0
-						if !quiz && (last.include? x)
-							string << x.to_s.back2 if i == 0 && parts[i+1] != nil
-							string << ".".back2 if parts[i+1] != nil
-							string << x.to_s.back2 if parts[i+1] == nil
-						else
-							string << x.to_s.orange if i == 0 && parts[i+1] != nil
-							string << ".".orange if parts[i+1] != nil
-							string << x.to_s.orange if parts[i+1] == nil
-						end
-					else
-						string << x.to_s.grey2 if i == 0 && parts[i+1] != nil
-						string << ".".grey2 if parts[i+1] != nil
-						string << x.to_s.grey2 if parts[i+1] == nil
+			string = (lambda do
+				lambda do |p1,p2|
+					e1 = [p1,p2].cycle
+					partition(season) do |parts|
+						e1.next.call(parts)
 					end
-				end
-				string << " "
-				counter += 1
+				end.call(
+					lambda do |pp|
+						string << pick_color.call(pp.first,pp.first.to_s)
+						string<< "#{pick_color.call(pp.last,"-"+pp.last.to_s)}" if pp.size==2
+						if pp.size > 2
+							temp = pp.drop 1
+							lasti = temp.pop
+							temp.each {|t| string << pick_color.call(t,".")}
+							string << pick_color.call(lasti,lasti.to_s)
+						end
+						string << " "
+					end,
+					lambda do |pp|
+						str = ""
+						str = "#{"-".orange}#{pp.last}" if pp.size == 2
+						str = "#{"."*(pp.size - 2)}#{pp.last}" if pp.size> 2
+						string << "#{pp.first}#{str}".grey
+						string << " "
+					end )
+			end.call)
+			yield string << "\n"
 		end
-		yield string << "\n"
-	end
 	end
 	def season_partition(list)
 		temp = []

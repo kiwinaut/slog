@@ -5,8 +5,10 @@ require 'time'
 require 'yaml'
 require "color_module"
 require "hash_operations"
-VERSION = "0.4.1"
+#require "static_text"
+VERSION = "0.4.2"
 $options = {}
+#include TextData
 `. << EOF
 export LINES
 EOF`
@@ -24,7 +26,7 @@ parser = OptionParser.new do |opts|
 	opts.on("-e episodes", "--episodes episodes", "Episodes") do |epis|
 		$options[:epis] = epis
 	end
-	opts.on("-l", "--list-all","List all titles") do |list|
+	opts.on("-l all", "--list-all all","List all titles") do |list|
 		$options[:list] = list
 	end
 	opts.on("-i", "--interactive","Interactive mod for rename, delete etc..") do |var|
@@ -40,11 +42,11 @@ parser.parse!
 
 def web_command(picks)
 	picks.each do |dom|
-		str = (dom[:epis].last + 1).to_s
-		s = "S0#{str[0]}"
-		e = "E#{str[1,2]}"
-		`opera-developer "http://kickass.to/torrents/usearch/?q=#{dom[:title]} #{s}#{e}"`
-		`opera-developer "http://divxplanet.com/index.php?page=name#{dom[:title]}"`
+		#str = (dom[:epis].last + 1).to_s
+		#s = "S0#{str[0]}"
+		#e = "E#{str[1,2]}"
+		`opera-developer "http://kickass.to/torrents/usearch/?q=#{dom[:title]}"`
+		#`opera-developer "http://divxplanet.com/index.php?page=name#{dom[:title]}"`
 	end
 end
 def list(data)
@@ -212,17 +214,13 @@ intro2 = "\
               \\ \\___  \\  \\ \\ \\____  \\ \\ \\/\\ \\  \\ \\ \\__ \\
                \\/\\_____\\  \\ \\_____\\  \\ \\_____\\  \\ \\_____\\
                 \\/_____/   \\/_____/   \\/_____/   \\/_____/" + " #{VERSION}\n"
-puts intro2.grey
-$text_base = {
-	undo1: " [NOTHING TO UNDO!]".grey,
-	undo2: " [DONE!]".grey
-}
 $hashy = Hash_ops.new
 $hashy.save
 $recipe = 0
-#p $options
+
 $flag = false
 $flag = $options[:inter] unless $options[:inter].nil?
+
 if !$options.nil?
 	if !$options[:search].nil?
 		if !$options[:search].empty?
@@ -248,14 +246,18 @@ end
 
 case $recipe
 when 0
+	puts intro2.grey
 	#puts "0"
 when 1
+	puts VERSION.grey
 	#puts "1"
 	list $hashy.find($options[:search])
 when 2, 6
 	#puts "2"
+	puts intro2.grey
 	eval_prompt1
 when 3, 7
+	puts VERSION.grey
 	#flag == true
 	#puts "3"
 	result = $hashy.find($options[:search])
@@ -264,6 +266,7 @@ when 3, 7
 		eval_prompt2(result)
 	end
 when 4
+	puts VERSION.grey
 	#puts "4"
 	list $hashy.data
 	eval_prompt2($hashy.data)
@@ -277,7 +280,12 @@ when 5
 	end
 when 8
 	#puts "8"
-	list($hashy.data)
+	if $options[:list] == "d"
+		list($hashy.data.sort{|x,y| x[:time]<=>y[:time]})
+	end
+	if $options[:list] == "t"
+		list($hashy.data.sort{|x,y| x[:title]<=>y[:title]})
+	end
 when 9
 	puts "9"
 else
